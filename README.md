@@ -1,0 +1,2 @@
+# wazuh-ai
+wazuh troubleshooting 
