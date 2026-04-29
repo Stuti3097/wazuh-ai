@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Wazuh AI Troubleshooter</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: white;
+            padding: 15px 25px;
+            border-bottom: 1px solid #ddd;
+            font-weight: bold;
+        }
+
+        /* Layout */
+        .main {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .left { flex: 2; }
+        .right { flex: 1; }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+
+        /* Status */
+        .ok { color: green; font-weight: bold; }
+        .bad { color: red; font-weight: bold; }
+        .warn { color: orange; font-weight: bold; }
+
+        /* Chat box */
+        .chat-box {
+            height: 320px;
+            overflow-y: auto;
+            background: #fafafa;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            white-space: pre-line;
+            font-size: 14px;
+        }
+
+        /* Separate input box */
+        .input-separate {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-separate input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+
+        /* Buttons */
+        button {
+            background: #2d7ef7;
+            color: white;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1f5edc;
+        }
+
+        /* Quick actions */
+        .quick-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="navbar">
+        Wazuh AI Troubleshooter
+    </div>
+
+    <div class="main">
+
+        <!-- LEFT -->
+        <div class="left">
+
+            <!-- Summary -->
+            <div class="card">
+                <h3>Issue Summary</h3>
+                <div id="summary">Click "Run Check"</div>
+                <br>
+                <button onclick="startCheck()">Run Check</button>
+            </div>
+
+            <!-- Troubleshooting -->
+            <!-- System Logs -->
+            <div class="card">
+                <h3>System Logs</h3>
+                <div id="logs" class="chat-box"></div>
+            </div>
+
+            <!-- Manual Troubleshooting -->
+            <div class="card">
+                <h3>Manual Troubleshooting</h3>
+
+                <div id="manualOutput" class="chat-box"></div>
+
+                <div class="input-separate">
+                    <input id="manualInput" placeholder="Enter number or yes/no..." />
+                    <button onclick="handleManual()">Send</button>
+                </div>
+            </div>
+
+            <!-- AI Assistant -->
+            <div class="card">
+                <h3>AI Assistant</h3>
+
+                <div id="assistantOutput" class="chat-box"></div>
+
+                <div class="input-separate">
+                    <input id="assistantInput" placeholder="Ask anything..." />
+                    <button onclick="handleAssistant()">Send</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT -->
+        <div class="right">
+
+            <div class="card">
+                <h3>Services</h3>
+                <div id="services"></div>
+            </div>
+
+            <div class="card">
+                <h3>Cluster</h3>
+                <div id="cluster"></div>
+            </div>
+
+            <div class="card">
+                <h3>Memory</h3>
+                <div id="memory"></div>
+            </div>
+
+            <div class="card">
+                <h3>Detected Issues</h3>
+                <div id="issues"></div>
+            </div>
+
+            <div class="card">
+                <h3>Quick Actions</h3>
+                <div id="quickActions" class="quick-grid"></div>
+            </div>
+
+            <div class="card">
+                <h3>Session Info</h3>
+                <div id="session"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script src="manual.js"></script>
+    <script src="assistant.js"></script>
+    <script src="app.js"></script>
+
+</body>
+</html>

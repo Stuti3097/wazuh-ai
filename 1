@@ -1,0 +1,225 @@
+const BASE_URL = "http://192.168.56.57:8000";
+
+let issues = [];
+let step = "idle";
+let selectedService = "";
+
+// Elements
+const output = document.getElementById("output");
+const interaction = document.getElementById("interaction");
+const input = document.getElementById("userInput");
+
+// -----------------------------
+// Utility
+// -----------------------------
+function print(text) {
+    output.innerText += text + "\n";
+    output.scrollTop = output.scrollHeight;
+}
+
+function chat(text) {
+    interaction.innerText += text + "\n";
+    interaction.scrollTop = interaction.scrollHeight;
+}
+
+function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+}
+
+// -----------------------------
+// RIGHT PANEL UI
+// -----------------------------
+function updateServices(checks) {
+    const el = document.getElementById("services");
+    el.innerHTML = "";
+
+    checks.forEach(c => {
+        let cls = c.status === "active" ? "ok" : "bad";
+        el.innerHTML += `
+            <div>${c.name}: <span class="${cls}">${c.status}</span></div>
+        `;
+    });
+}
+
+function updateCluster(c) {
+    const el = document.getElementById("cluster");
+
+    if (!c) {
+        el.innerHTML = "No data";
+        return;
+    }
+
+    let cls = c.status === "green" ? "ok" : (c.status === "yellow" ? "warn" : "bad");
+
+    el.innerHTML = `
+        Status: <span class="${cls}">${c.status}</span><br>
+        Nodes: ${c.number_of_nodes}<br>
+        Active Shards: ${c.active_shards}<br>
+        Unassigned: ${c.unassigned_shards}
+    `;
+}
+
+function updateMemory(m) {
+    const el = document.getElementById("memory");
+
+    el.innerHTML = `
+        Total: ${m.total} MB<br>
+        Used: ${m.used} MB<br>
+        Free: ${m.free} MB
+    `;
+}
+
+// -----------------------------
+// NEW: Detected Issues Panel
+// -----------------------------
+function updateIssues(list) {
+    const el = document.getElementById("issues");
+
+    if (!list || list.length === 0) {
+        el.innerHTML = `<span class="ok">No issues</span>`;
+        return;
+    }
+
+    el.innerHTML = `
+        <div style="color:red;font-weight:bold;margin-bottom:8px;">
+            ⚠ Detected Issues (${list.length})
+        </div>
+        ${list.map((i, idx) => `
+            <div style="margin-bottom:6px;">
+                <b>${idx + 1}</b> ${i} is NOT running
+            </div>
+        `).join("")}
+    `;
+}
+
+// -----------------------------
+// NEW: Quick Actions
+// -----------------------------
+function renderQuickActions() {
+    const el = document.getElementById("quickActions");
+
+    el.innerHTML = `
+        <button onclick="quickRestart('wazuh-indexer')">Restart Indexer</button>
+        <button onclick="quickRestart('wazuh-manager')">Restart Manager</button>
+        <button onclick="checkCluster()">Check Cluster</button>
+        <button onclick="startCheck()">Run Full Check</button>
+    `;
+}
+
+async function quickRestart(service) {
+    print("Restarting " + service + "...");
+
+    let res = await fetch(BASE_URL + "/fix?service=" + service);
+    let data = await res.json();
+
+    print(data.message);
+}
+
+// -----------------------------
+// NEW: Session Info
+// -----------------------------
+function renderSessionInfo() {
+    const el = document.getElementById("session");
+
+    const now = new Date();
+
+    el.innerHTML = `
+        Session ID: ${Math.random().toString(36).substring(2,10)}<br>
+        Started: ${now.toLocaleString()}<br>
+        Duration: Running
+    `;
+}
+
+// -----------------------------
+// MAIN CHECK
+// -----------------------------
+async function startCheck() {
+
+    output.innerText = "";
+    print("Starting system checks...\n");
+
+    let res = await fetch(BASE_URL + "/check");
+    let data = await res.json();
+
+    issues = data.issues || [];
+
+    updateServices(data.checks);
+    updateCluster(data.cluster_details);
+    updateMemory(data.memory);
+    updateIssues(issues);
+
+    renderQuickActions();
+    renderSessionInfo();
+
+    document.getElementById("summary").innerText =
+        issues.length === 0
+            ? "System healthy"
+            : issues.length + " issue(s) detected";
+
+    // Chat simulation
+    for (const c of data.checks) {
+        print("Checking " + c.name + "...");
+        await sleep(300);
+        print("Status: " + c.status.toUpperCase() + "\n");
+    }
+
+    if (issues.length === 0) {
+        print("No issues found.");
+        step = "idle";
+        return;
+    }
+
+    print("Select issue number to fix:");
+    step = "choose";
+}
+
+// -----------------------------
+// CHAT FLOW
+// -----------------------------
+async function handleInput() {
+
+    const value = input.value.trim();
+    input.value = "";
+
+    if (!value) return;
+
+    chat("You: " + value);
+
+    if (step === "choose") {
+
+        let index = parseInt(value) - 1;
+
+        if (isNaN(index) || index < 0 || index >= issues.length) {
+            chat("Invalid selection.");
+            return;
+        }
+
+        selectedService = issues[index];
+
+        chat("Selected: " + selectedService);
+        chat("Restart it? (yes/no)");
+
+        step = "confirm";
+        return;
+    }
+
+    if (step === "confirm") {
+
+        if (value.toLowerCase() !== "yes") {
+            chat("Cancelled.");
+            step = "idle";
+            return;
+        }
+
+        print("Restarting " + selectedService + "...");
+
+        let res = await fetch(BASE_URL + "/fix?service=" + selectedService);
+        let data = await res.json();
+
+        chatdata.message);
+        step = "idle";
+        return;
+    }
+
+    chat("Run system check first.");
+}
