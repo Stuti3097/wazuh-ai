@@ -180,14 +180,17 @@ def filebeat_test():
     return {
         "output": result
     }
+
 @app.post("/assistant")
 def assistant(payload: dict):
 
     user_input = payload.get("message", "")
+    context = payload.get("context", {})
 
-    result = process_assistant(user_input)
+    result = process_assistant(user_input, context)
 
     return {"response": result}
+
 @app.get("/run")
 def run_command(cmd: str = ""):
     output = run(cmd)

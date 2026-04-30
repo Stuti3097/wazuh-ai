@@ -1,7 +1,14 @@
 import subprocess
 
-def run_fix(cmd):
+
+def run_command(cmd):
     try:
-        return subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).decode()
-    except Exception as e:
-        return str(e)
+        result = subprocess.check_output(
+            cmd,
+            shell=True,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+        return result.strip()
+    except subprocess.CalledProcessError as e:
+        return e.output.strip()

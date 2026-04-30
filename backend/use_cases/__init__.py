@@ -32,14 +32,18 @@ def best_match(user_input: str):
     return best, best_score
 
 
-def run_use_cases(user_input):
+def run_use_cases(user_input, context):
 
     uc, score = best_match(user_input)
 
     # threshold (tune if needed)
     if uc and score >= 65:
         if uc["handler"] == "dashboard_error":
-            from .dashboard_error import get_dashboard_error
-            return get_dashboard_error()
-
+            from .dashboard_error import dashboard_error_flow
+            
+            if not context:
+                 return dashboard_error_flow(None, {})
+            else:
+                 return dashboard_error_flow(user_input, context)
+         
     return None

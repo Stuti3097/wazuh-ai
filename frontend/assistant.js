@@ -1,11 +1,13 @@
 const assistantOutput = document.getElementById("assistantOutput");
 const assistantInput = document.getElementById("assistantInput");
 
+// ✅ ADDED (context storage)
+let context = {};
+
 function aPrint(text) {
     assistantOutput.innerText += text + "\n";
     assistantOutput.scrollTop = assistantOutput.scrollHeight;
 }
-
 async function handleAssistant() {
 
     let value = assistantInput.value.trim();
@@ -22,71 +24,49 @@ async function handleAssistant() {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ message: value })
+            body: JSON.stringify({
+                message: value,
+                context: context
+            })
         });
 
-        const data = await res.json();
+        console.log("STATUS:", res.status);
+
+        const text = await res.text();
+        console.log("RAW RESPONSE:", text);
+
+        let data;
+
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            aPrint("Invalid response from backend.");
+            console.error("JSON parse error:", e);
+            return;
+        }
 
         if (!data || !data.response) {
             aPrint("No response from assistant.");
+            console.log("BAD RESPONSE:", data);
             return;
         }
 
         const r = data.response;
 
-        // -----------------------------
-        // USE CASE EXECUTION (REAL FIX)
-        // -----------------------------
+        // USE CASE HANDLING
         if (r.type === "use_case") {
 
-            aPrint("\nIssue: " + r.name);
-            aPrint("\nStarting troubleshooting...\n");
+            // update context
+            context = r.context || {};
 
-            for (let i = 0; i < r.steps.length; i++) {
+            // show main output
+            if (r.display) {
+                aPrint(r.display);
+            }
 
-                const step = r.steps[i];
-
-                aPrint("Step " + (i + 1) + ": " + step.title);
-
-                if (step.run) {
-
-                    aPrint("Running: " + step.run);
-
-                    try {
-                        const runRes = await fetch(
-                            BASE_URL + "/run?cmd=" + encodeURIComponent(step.run)
-                        );
-
-                        const runData = await runRes.json();
-                        const output = runData.output || "";
-
-                        aPrint("Result:");
-                        aPrint(output);
-
-                        // ✅ validation
-                        if (step.expected) {
-                            if (output.toLowerCase().includes(step.expected.toLowerCase())) {
-                                aPrint("✔ OK");
-                            } else {
-                                aPrint("❌ NOT OK");
-
-                                if (step.fix) {
-                                    aPrint("Fix:");
-                                    step.fix.forEach(f => aPrint(" - " + f));
-                                }
-                            }
-                        }
-
-                    } catch (err) {
-                        aPrint("Execution failed.");
-                    }
-                }
-
-                if (step.note) {
-                    aPrint("Note: " + step.note);
-                }
-
-                aPrint("");
+            // show next questions
+            if (r.ask && r.ask.length > 0) {
+                r.ask.forEach(q => aPrint(q));
             }
 
             return;
@@ -96,6 +76,7 @@ async function handleAssistant() {
         aPrint(r.message || "No useful response.");
 
     } catch (err) {
+        console.error("FULL ERROR:", err);
         aPrint("Backend error.");
     }
 }
