@@ -1,2 +1,2 @@
-# wazuh-ai
+# wazuh- auto troubleshooting
 wazuh troubleshooting 
