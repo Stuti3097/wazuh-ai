@@ -1,6 +1,7 @@
 from executor import run_command
 from config import KIBANA_USERNAME, INDEXER_URL
 
+import re
 import secrets
 import string
 
@@ -8,15 +9,126 @@ import string
 class FixEngine:
 
     # -----------------------------------------
-    # RESTART INDEXER
+    # GET IP FROM config.yml (control file)
+    # -----------------------------------------
+    @staticmethod
+    def get_control_ip():
+        output = run_command(
+            "tar -axf /home/vagrant/wazuh-install-files.tar "
+            "wazuh-install-files/config.yml -O"
+        ) or ""
+
+        in_indexer = False
+
+        for line in output.splitlines():
+            if "indexer:" in line:
+                in_indexer = True
+                continue
+            if in_indexer and line.strip().endswith(":") and "ip:" not in line:
+                in_indexer = False
+            if in_indexer and "ip:" in line:
+                return line.strip()
+
+        return ""
+
+    # -----------------------------------------
+    # GET IP FROM INDEXER CONFIG
+    # -----------------------------------------
+    @staticmethod
+    def get_indexer_ip():
+        return run_command(
+            "grep network.host /etc/wazuh-indexer/opensearch.yml"
+        ) or ""
+
+    # -----------------------------------------
+    # GET IP FROM DASHBOARD CONFIG
+    # -----------------------------------------
+    @staticmethod
+    def get_dashboard_ip():
+        return run_command(
+            "grep opensearch.hosts /etc/wazuh-dashboard/opensearch_dashboards.yml"
+        ) or ""
+
+    # -----------------------------------------
+    # EXTRACT IP (helper)
+    # -----------------------------------------
+    @staticmethod
+    def extract_ip(text):
+        if not text:
+            return None
+        match = re.search(r'(\d+\.\d+\.\d+\.\d+)', text)
+        return match.group(1) if match else None
+
+    # -----------------------------------------
+    # COMPARE IPS
+    # -----------------------------------------
+    @staticmethod
+    def compare_ips():
+        control   = FixEngine.get_control_ip()
+        indexer   = FixEngine.get_indexer_ip()
+        dashboard = FixEngine.get_dashboard_ip()
+
+        c_ip = FixEngine.extract_ip(control)
+        i_ip = FixEngine.extract_ip(indexer)
+        d_ip = FixEngine.extract_ip(dashboard)
+
+        return {
+            "control":   c_ip,
+            "indexer":   i_ip,
+            "dashboard": d_ip,
+            "match":     (c_ip == i_ip == d_ip),
+        }
+
+    # -----------------------------------------
+    # GET CERT PATHS FROM DASHBOARD CONFIG
+    # -----------------------------------------
+    @staticmethod
+    def get_cert_paths():
+        return run_command(
+            "grep -E 'certificate|key|ca' "
+            "/etc/wazuh-dashboard/opensearch_dashboards.yml"
+        ) or ""
+
+    # -----------------------------------------
+    # LIST CERT FILES
+    # -----------------------------------------
+    @staticmethod
+    def list_cert_files():
+        return run_command("ls -lrt /etc/wazuh-dashboard/certs") or ""
+
+    # -----------------------------------------
+    # FIX CERT PERMISSIONS
+    # -----------------------------------------
+    @staticmethod
+    def fix_cert_permissions():
+        cmds = [
+            "chmod 500 /etc/wazuh-dashboard/certs",
+            "chmod 400 /etc/wazuh-dashboard/certs/*",
+            "chown -R wazuh-dashboard:wazuh-dashboard /etc/wazuh-dashboard/certs",
+        ]
+        output = ""
+        for cmd in cmds:
+            output += (run_command(cmd) or "") + "\n"
+        return output
+
+    # -----------------------------------------
+    # RESTART INDEXER  (Bug fixed: out was undefined)
     # -----------------------------------------
     @staticmethod
     def restart_indexer():
-        run_command("systemctl restart wazuh-indexer")
-        return run_command("systemctl is-active wazuh-indexer")
+        out    = run_command("systemctl restart wazuh-indexer") or ""
+        status = run_command("systemctl is-active wazuh-indexer") or ""
+        return f"Restart output:\n{out}\nStatus after restart: {status}"
 
     # -----------------------------------------
-    # CONNECTIVITY CHECK (uses runtime password)
+    # DASHBOARD STATUS
+    # -----------------------------------------
+    @staticmethod
+    def status_dashboard():
+        return run_command("systemctl is-active wazuh-dashboard") or "unknown"
+
+    # -----------------------------------------
+    # CONNECTIVITY CHECK
     # -----------------------------------------
     @staticmethod
     def check_connectivity(password):
@@ -24,7 +136,7 @@ class FixEngine:
             f"curl -XGET -k -u {KIBANA_USERNAME}:{password} "
             f"{INDEXER_URL}/_cluster/health"
         )
-        return run_command(cmd)
+        return run_command(cmd) or ""
 
     # -----------------------------------------
     # GENERATE NEW PASSWORD
@@ -39,71 +151,67 @@ class FixEngine:
     # -----------------------------------------
     @staticmethod
     def apply_new_password(password):
-
         cmd1 = (
             "/usr/share/wazuh-indexer/plugins/opensearch-security/tools/"
             f"wazuh-passwords-tool.sh -u kibanaserver -p '{password}'"
         )
-
         cmd2 = (
             f"echo {password} | "
             "/usr/share/wazuh-dashboard/bin/opensearch-dashboards-keystore "
             "--allow-root add -f --stdin opensearch.password"
         )
-
-        out1 = run_command(cmd1)
-        out2 = run_command(cmd2)
-
+        out1 = run_command(cmd1) or ""
+        out2 = run_command(cmd2) or ""
         return f"{out1}\n{out2}"
 
     # -----------------------------------------
-    # VERIFY PASSWORD (AFTER APPLY)
+    # VERIFY PASSWORD
     # -----------------------------------------
     @staticmethod
     def verify_password(password):
-
         cmd = (
             f"curl -s -k -u {KIBANA_USERNAME}:{password} "
             f"{INDEXER_URL}"
         )
-
-        return run_command(cmd)
+        return run_command(cmd) or ""
 
     # -----------------------------------------
-    # HEAP FIX (STEPS ONLY)
+    # HEAP FIX STEPS (manual instructions)
     # -----------------------------------------
     @staticmethod
     def heap_steps():
         return (
             "Edit file:\n"
-            "/etc/wazuh-indexer/jvm.options\n\n"
-            "Set heap = 50% RAM\n"
-            "(Example for 8GB system:)\n"
-            "-Xms4g\n"
-            "-Xmx4g\n\n"
+            "  /etc/wazuh-indexer/jvm.options\n\n"
+            "Set heap to 50% of your RAM.\n"
+            "Example for 8 GB system:\n"
+            "  -Xms4g\n"
+            "  -Xmx4g\n\n"
             "Then restart:\n"
-            "systemctl restart wazuh-indexer"
+            "  systemctl restart wazuh-indexer"
         )
 
     # -----------------------------------------
-    # SECURITY INIT
+    # SECURITY INIT COMMAND
     # -----------------------------------------
     @staticmethod
     def init_command():
-        return "/usr/share/wazuh-indexer/bin/indexer-security-init.sh"
+        return (
+            "/usr/share/wazuh-indexer/bin/indexer-security-init.sh"
+        )
 
     # -----------------------------------------
-    # PERMISSION FIX
+    # PERMISSION FIX STEPS (manual instructions)
     # -----------------------------------------
     @staticmethod
     def permission_fix():
         return (
-            "Run:\n"
-            "chmod 600 /usr/share/wazuh-indexer/config/jvm.options\n"
-            "chmod 600 /usr/share/wazuh-indexer/config/opensearch.yml\n"
-            "chmod 600 /usr/share/wazuh-indexer/config/opensearch-security/*.yml\n\n"
+            "Run the following commands:\n"
+            "  chmod 600 /usr/share/wazuh-indexer/config/jvm.options\n"
+            "  chmod 600 /usr/share/wazuh-indexer/config/opensearch.yml\n"
+            "  chmod 600 /usr/share/wazuh-indexer/config/opensearch-security/*.yml\n\n"
             "Then restart:\n"
-            "systemctl restart wazuh-indexer"
+            "  systemctl restart wazuh-indexer"
         )
 
     # -----------------------------------------
@@ -111,101 +219,35 @@ class FixEngine:
     # -----------------------------------------
     @staticmethod
     def check_disk():
-        return run_command("df -h")
-
-
-    from executor import run_command
-import re
-
-
-class FixEngine:
+        return run_command("df -h") or ""
 
     # -----------------------------------------
-    # GET IP FROM config.yml (control file)
+    # MANUAL COMMAND SETS  (for "give me commands" path)
     # -----------------------------------------
     @staticmethod
-    def get_control_ip():
-        return run_command(
-            "tar -axf wazuh-install-files.tar wazuh-install-files/config.yml -O |grep -A 2 indexer | grep ip"
+    def commands_ip_fix(c_ip):
+        return (
+            f"sed -i 's|https://.*:9200|https://{c_ip}:9200|' "
+            "/etc/wazuh-dashboard/opensearch_dashboards.yml\n"
+            "systemctl restart wazuh-dashboard"
         )
 
-    # -----------------------------------------
-    # GET IP FROM INDEXER CONFIG
-    # -----------------------------------------
     @staticmethod
-    def get_indexer_ip():
-        return run_command(
-            "grep network.host /etc/wazuh-indexer/opensearch.yml"
+    def commands_cert_permissions():
+        return (
+            "chmod 500 /etc/wazuh-dashboard/certs\n"
+            "chmod 400 /etc/wazuh-dashboard/certs/*\n"
+            "chown -R wazuh-dashboard:wazuh-dashboard /etc/wazuh-dashboard/certs\n"
+            "systemctl restart wazuh-dashboard"
         )
 
-    # -----------------------------------------
-    # GET IP FROM DASHBOARD CONFIG
-    # -----------------------------------------
     @staticmethod
-    def get_dashboard_ip():
-        return run_command(
-            "grep opensearch.hosts /etc/wazuh-dashboard/opensearch_dashboards.yml"
+    def commands_restart_indexer():
+        return "systemctl restart wazuh-indexer"
+
+    @staticmethod
+    def commands_get_indexer_logs():
+        return (
+            "journalctl -u wazuh-indexer --since '1 hour ago' "
+            "| grep -i -E 'error|warn'"
         )
-
-    # -----------------------------------------
-    # EXTRACT IP (helper)
-    # -----------------------------------------
-    @staticmethod
-    def extract_ip(text):
-        match = re.search(r'(\d+\.\d+\.\d+\.\d+)', text)
-        return match.group(1) if match else None
-
-    # -----------------------------------------
-    # COMPARE IPS
-    # -----------------------------------------
-    @staticmethod
-    def compare_ips():
-
-        control = FixEngine.get_control_ip()
-        indexer = FixEngine.get_indexer_ip()
-        dashboard = FixEngine.get_dashboard_ip()
-
-        c_ip = FixEngine.extract_ip(control)
-        i_ip = FixEngine.extract_ip(indexer)
-        d_ip = FixEngine.extract_ip(dashboard)
-
-        return {
-            "control": c_ip,
-            "indexer": i_ip,
-            "dashboard": d_ip,
-            "match": (c_ip == i_ip == d_ip)
-        }
-
-    # -----------------------------------------
-    # GET CERT PATH FROM DASHBOARD CONFIG
-    # -----------------------------------------
-    @staticmethod
-    def get_cert_paths():
-        return run_command(
-            "grep -E 'certificate|key|ca' /etc/wazuh-dashboard/opensearch_dashboards.yml"
-        )
-
-    # -----------------------------------------
-    # CHECK CERT FILES
-    # -----------------------------------------
-    @staticmethod
-    def list_cert_files():
-        return run_command("ls -lrt /etc/wazuh-dashboard/certs")
-
-    # -----------------------------------------
-    # FIX CERT PERMISSIONS (ONLY WHEN USER ALLOWS)
-    # -----------------------------------------
-    @staticmethod
-    def fix_cert_permissions():
-
-        cmds = [
-            "chmod 500 /etc/wazuh-dashboard/certs",
-            "chmod 400 /etc/wazuh-dashboard/certs/*",
-            "chown -R wazuh-dashboard:wazuh-dashboard /etc/wazuh-dashboard/certs"
-        ]
-
-        output = ""
-        for cmd in cmds:
-            output += run_command(cmd) + "\n"
-
-        return output

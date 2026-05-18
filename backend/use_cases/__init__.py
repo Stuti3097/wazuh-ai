@@ -1,6 +1,8 @@
 from rapidfuzz import fuzz
 
-# canonical phrases per use case
+# -----------------------------------------------------------------------------
+# REGISTERED USE CASES
+# -----------------------------------------------------------------------------
 USE_CASES = [
     {
         "name": "Dashboard Error",
@@ -8,7 +10,8 @@ USE_CASES = [
             "dashboard server is not ready yet",
             "wazuh dashboard is not ready",
             "dashboard not ready",
-            "dashboard cannot connect to indexer"
+            "dashboard cannot connect to indexer",
+            "wazuh dashboard is not ready yet",
         ],
         "handler": "dashboard_error"
     },
@@ -16,10 +19,12 @@ USE_CASES = [
 ]
 
 
+# -----------------------------------------------------------------------------
+# FUZZY MATCHER
+# -----------------------------------------------------------------------------
 def best_match(user_input: str):
-    text = user_input.lower()
-
-    best = None
+    text       = user_input.lower()
+    best       = None
     best_score = 0
 
     for uc in USE_CASES:
@@ -27,23 +32,44 @@ def best_match(user_input: str):
             score = fuzz.token_set_ratio(text, phrase)
             if score > best_score:
                 best_score = score
-                best = uc
+                best       = uc
 
     return best, best_score
 
 
+# -----------------------------------------------------------------------------
+# MAIN ROUTER
+# -----------------------------------------------------------------------------
 def run_use_cases(user_input, context):
 
+    # ---------------------------------------------------------
+    # PRIORITY: if there is already an active flow in progress,
+    # skip keyword matching entirely and continue that flow.
+    # user_input is the user's answer to the last question.
+    # ---------------------------------------------------------
+    if context and context.get("stage"):
+        handler = context.get("handler", "dashboard_error")
+
+        if handler == "dashboard_error":
+            from .dashboard_error import dashboard_error_flow
+            return dashboard_error_flow(user_input, context)
+
+        # add more handlers here as new use cases are built
+        return None
+
+    # ---------------------------------------------------------
+    # No active flow — try to match a new use case by keyword
+    # ---------------------------------------------------------
     uc, score = best_match(user_input)
 
-    # threshold (tune if needed)
     if uc and score >= 65:
         if uc["handler"] == "dashboard_error":
             from .dashboard_error import dashboard_error_flow
-            
-            if not context:
-                 return dashboard_error_flow(None, {})
-            else:
-                 return dashboard_error_flow(user_input, context)
-         
+            result = dashboard_error_flow(None, {})
+            # stamp the handler into context so follow-up messages
+            # know which flow to continue
+            if result and result.get("context") is not None:
+                result["context"]["handler"] = "dashboard_error"
+            return result
+
     return None

@@ -1,43 +1,53 @@
 class LogAnalyzer:
 
+    # -----------------------------------------
+    # DETECT KNOWN ISSUES FROM LOG TEXT
+    # Returns a list of issue keys found in the logs
+    # e.g. ["heap", "auth"]
+    # -----------------------------------------
     @staticmethod
     def get_issues(logs):
+        if not logs:
+            return []
 
-        logs = logs.lower()
+        text   = logs.lower()
         issues = []
 
-        # INIT
-        if "not yet initialized" in logs:
+        # NOT INITIALIZED
+        # Only relevant on fresh/new installations
+        if "not yet initialized" in text:
             issues.append("init")
 
-        # -------------------------
-        # HEAP (expanded detection)
-        # -------------------------
-        if (
-            "circuit_breaking_exception" in logs
-            or "data too large" in logs
-            or "high heap usage" in logs
-            or "gc did bring memory usage down" in logs
-            or "g1gc" in logs
-            or "heap usage" in logs
-        ):
+        # HEAP / MEMORY
+        # Can be fixed auto or manual — handled in dashboard_error_flow
+        if any(kw in text for kw in [
+            "circuit_breaking_exception",
+            "data too large",
+            "high heap usage",
+            "gc did bring memory usage down",
+            "g1gc",
+            "heap usage",
+        ]):
             issues.append("heap")
 
-        # AUTH
-        if "authentication finally failed for kibanaserver" in logs:
+        # AUTH FAILURE
+        # Flag only — fix steps to be added later
+        if "authentication finally failed for kibanaserver" in text:
             issues.append("auth")
 
-        # WATERMARK
-        if (
-            "low disk watermark" in logs
-             or "high disk watermark" in logs
-             or "flood stage disk watermark" in logs
-             or "disk usage exceeded" in logs 
-         ):
+        # DISK WATERMARK
+        # Inform only — user must free up disk manually
+        if any(kw in text for kw in [
+            "low disk watermark",
+            "high disk watermark",
+            "flood stage disk watermark",
+            "disk usage exceeded",
+        ]):
             issues.append("watermark")
 
-        # PERMISSION
-        if "insecure file permissions" in logs:
+        # FILE PERMISSIONS
+        # Flag only — fix steps to be added later
+        if "insecure file permissions" in text:
             issues.append("permission")
 
         return issues
