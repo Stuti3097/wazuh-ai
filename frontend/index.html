@@ -10,25 +10,43 @@
             background: #f5f7fa;
         }
 
-        /* Navbar */
         .navbar {
             background: white;
-            padding: 15px 25px;
+            padding: 12px 25px;
             border-bottom: 1px solid #ddd;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            font-weight: normal;
+            color: #555;
+            flex-wrap: wrap;
+        }
+
+        .navbar-session {
+            font-family: monospace;
+            color: #2d7ef7;
             font-weight: bold;
         }
 
-        /* Layout */
         .main {
             display: flex;
             gap: 20px;
             padding: 20px;
         }
 
-        .left { flex: 2; }
+        .left  { flex: 2; }
         .right { flex: 1; }
 
-        /* Cards */
         .card {
             background: white;
             border-radius: 10px;
@@ -42,12 +60,10 @@
             font-size: 16px;
         }
 
-        /* Status */
-        .ok { color: green; font-weight: bold; }
-        .bad { color: red; font-weight: bold; }
+        .ok   { color: green;  font-weight: bold; }
+        .bad  { color: red;    font-weight: bold; }
         .warn { color: orange; font-weight: bold; }
 
-        /* Chat box */
         .chat-box {
             height: 320px;
             overflow-y: auto;
@@ -59,10 +75,10 @@
             font-size: 14px;
         }
 
-        /* Separate input box */
         .input-separate {
             display: flex;
             gap: 10px;
+            margin-top: 8px;
         }
 
         .input-separate input {
@@ -72,7 +88,6 @@
             border: 1px solid #ccc;
         }
 
-        /* Buttons */
         button {
             background: #2d7ef7;
             color: white;
@@ -81,12 +96,18 @@
             border-radius: 6px;
             cursor: pointer;
         }
+        button:hover { background: #1f5edc; }
 
-        button:hover {
-            background: #1f5edc;
+        .btn-green {
+            background: #16a34a;
+        }
+        .btn-green:hover { background: #15803d; }
+
+        .btn-full {
+            width: 100%;
+            margin-top: 8px;
         }
 
-        /* Quick actions */
         .quick-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -98,7 +119,12 @@
 <body>
 
     <div class="navbar">
-        Wazuh AI Troubleshooter
+        <span>Wazuh AI Troubleshooter</span>
+        <div class="navbar-right">
+            <span>Session: <span id="sessionId" class="navbar-session">loading...</span></span>
+            <span id="sessionStarted"></span>
+            <button class="btn-green" onclick="downloadReport()">Download Report</button>
+        </div>
     </div>
 
     <div class="main">
@@ -106,7 +132,6 @@
         <!-- LEFT -->
         <div class="left">
 
-            <!-- Summary -->
             <div class="card">
                 <h3>Issue Summary</h3>
                 <div id="summary">Click "Run Check"</div>
@@ -114,33 +139,25 @@
                 <button onclick="startCheck()">Run Check</button>
             </div>
 
-            <!-- Troubleshooting -->
-            <!-- System Logs -->
             <div class="card">
                 <h3>System Logs</h3>
                 <div id="logs" class="chat-box"></div>
             </div>
 
-            <!-- Manual Troubleshooting -->
             <div class="card">
                 <h3>Manual Troubleshooting</h3>
-
                 <div id="manualOutput" class="chat-box"></div>
-
                 <div class="input-separate">
                     <input id="manualInput" placeholder="Enter number or yes/no..." />
                     <button onclick="handleManual()">Send</button>
                 </div>
             </div>
 
-            <!-- AI Assistant -->
             <div class="card">
-                <h3>AI Assistant</h3>
-
+                <h3>Auto Troubleshooting</h3>
                 <div id="assistantOutput" class="chat-box"></div>
-
                 <div class="input-separate">
-                    <input id="assistantInput" placeholder="Ask anything..." />
+                    <input id="assistantInput" placeholder="Describe your issue..." />
                     <button onclick="handleAssistant()">Send</button>
                 </div>
             </div>
@@ -178,10 +195,10 @@
             <div class="card">
                 <h3>Session Info</h3>
                 <div id="session"></div>
+                <button class="btn-green btn-full" onclick="downloadReport()">Download Report</button>
             </div>
 
         </div>
-
     </div>
 
     <script src="manual.js"></script>

@@ -78,7 +78,26 @@ class FixEngine:
             "dashboard": d_ip,
             "match":     (c_ip == i_ip == d_ip),
         }
+    # -----------------------------------------
+    # FULL IP CHECK
+    # -----------------------------------------
+    @staticmethod
+    def check_ips():
 
+        data = FixEngine.compare_ips()
+
+        result = (
+            f"Control IP:   {data['control']}\n"
+            f"Indexer IP:   {data['indexer']}\n"
+            f"Dashboard IP: {data['dashboard']}"
+        )
+
+        if not data["match"]:
+            result += "\n\n[ERROR] IP mismatch detected."
+        else:
+            result += "\n\n[OK] IP configuration looks correct."
+
+        return result
     # -----------------------------------------
     # GET CERT PATHS FROM DASHBOARD CONFIG
     # -----------------------------------------
@@ -95,7 +114,38 @@ class FixEngine:
     @staticmethod
     def list_cert_files():
         return run_command("ls -lrt /etc/wazuh-dashboard/certs") or ""
+    # -----------------------------------------
+    # CHECK CERT PERMISSIONS
+    # -----------------------------------------
+    @staticmethod
+    def check_cert_permissions():
 
+        perms = run_command(
+            "ls -ld /etc/wazuh-dashboard/certs"
+        ) or ""
+
+        files = run_command(
+            "ls -l /etc/wazuh-dashboard/certs"
+        ) or ""
+
+        return (
+            f"Directory permissions:\n{perms}\n\n"
+            f"Certificate files:\n{files}"
+        )
+
+        # -----------------------------------------
+    # CHECK CERT PATHS
+    # -----------------------------------------
+    @staticmethod
+    def check_cert_paths():
+
+        paths = FixEngine.get_cert_paths()
+        files = FixEngine.list_cert_files()
+
+        return (
+            f"Configured cert paths:\n{paths}\n\n"
+            f"Available cert files:\n{files}"
+        )
     # -----------------------------------------
     # FIX CERT PERMISSIONS
     # -----------------------------------------
@@ -127,6 +177,13 @@ class FixEngine:
     def status_dashboard():
         return run_command("systemctl is-active wazuh-dashboard") or "unknown"
 
+
+    # -----------------------------------------
+    # DASHBOARD STATUS
+    # -----------------------------------------
+    @staticmethod
+    def status_indexer():
+        return run_command("systemctl is-active wazuh-indexer") or "unknown"
     # -----------------------------------------
     # CONNECTIVITY CHECK
     # -----------------------------------------
@@ -190,7 +247,32 @@ class FixEngine:
             "Then restart:\n"
             "  systemctl restart wazuh-indexer"
         )
+        # -------------------------------------------------------------------------
+    # FIX JVM HEAP
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def fix_jvm_heap(heap_gb):
 
+        run_command(
+            f"sed -i 's/^-Xms.*/-Xms{heap_gb}g/' "
+            "/etc/wazuh-indexer/jvm.options"
+        )
+
+        run_command(
+            f"sed -i 's/^-Xmx.*/-Xmx{heap_gb}g/' "
+            "/etc/wazuh-indexer/jvm.options"
+        )
+
+        run_command(
+            "systemctl restart wazuh-indexer"
+        )
+
+        updated = run_command(
+            "grep -E '^-Xms|^-Xmx' "
+            "/etc/wazuh-indexer/jvm.options"
+        ) or "(could not read)"
+
+        return updated
     # -----------------------------------------
     # SECURITY INIT COMMAND
     # -----------------------------------------

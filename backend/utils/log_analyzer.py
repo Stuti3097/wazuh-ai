@@ -49,5 +49,10 @@ class LogAnalyzer:
         # Flag only — fix steps to be added later
         if "insecure file permissions" in text:
             issues.append("permission")
-
+        if any(kw in text for kw in [
+            "econnrefused",
+            "connectionerror",
+            "connect econnrefused",
+        ]):
+            issues.append("dashboard_connection_refused")
         return issues
