@@ -1,14 +1,14 @@
 wazuh_api:
-  host: "https://localhost:55000"
+  host: "https://<WazuhmanagerIp address>:55000"
   username: "wazuh"
-  password: "dJy+c.M0skanQEaXkarpYD6PoJ37GtDs"
+  password: "<wazuh api passowrd>"
   verify_ssl: false
 
 indexer:
-  url: "https://localhost:9200"
+  url: "https://<wazuh indexer IP>:9200"
   username: "admin"
-  password: "6npQBGTecV?IAP8V.rxI0e93ZVOx4yhA"
+  password: "<Your wazuh admin password>"
 
 kibana:
   username: "kibanaserver"
-  password: "hYIN6CXoJSoMqxq4qzj547E?dtaqTGjh"
+  password: "<Your kibana password>"
